@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: gestion-scolaire
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gestion_scolaire}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:Passer123}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: UTC
+
+server:
+  port: ${PORT:8081}
+
+app:
+  jwt:
+    # Clé HMAC-SHA256 (>= 32 octets). À surcharger en production via la variable JWT_SECRET.
+    secret: ${JWT_SECRET:gestion-scolaire-jwt-secret-key-super-securisee-2026-ipd-dakar}
+    expiration-ms: ${JWT_EXPIRATION_MS:900000} # access token : 15 minutes
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000} # refresh token : 7 jours
+  upload:
+    dir: ${UPLOAD_DIR:uploads}
+    photo-max-size: 2MB
+    doc-max-size: 5MB
+
+logging:
+  level:
+    sn.ipd.gestion_scolaire: INFO
+    org.springframework.security: WARN

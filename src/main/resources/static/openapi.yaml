@@ -1,0 +1,311 @@
+openapi: 3.1.0
+info:
+  title: API Gestion Scolaire — EduPlus
+  description: |
+    API REST sécurisée (JWT + Refresh Token) pour la gestion des étudiants,
+    enseignants, cours et inscriptions. Projet PDWA-L3 — IPD Dakar.
+  version: 1.0.0
+  contact:
+    name: Département Informatique — IPD Dakar
+servers:
+  - url: http://localhost:8080
+    description: Serveur local
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [username, email, password, firstName, lastName]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 50 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        firstName: { type: string }
+        lastName: { type: string }
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+    JwtResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        tokenType: { type: string }
+        id: { type: integer, format: int64 }
+        username: { type: string }
+        email: { type: string }
+        roles:
+          type: array
+          items: { type: string }
+    EtudiantRequest:
+      type: object
+      required: [matricule, firstName, lastName, email, dateNaissance]
+      properties:
+        matricule: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        dateNaissance: { type: string, format: date }
+        telephone: { type: string }
+        niveau: { type: string }
+    EtudiantResponse:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        matricule: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
+        dateNaissance: { type: string, format: date }
+        telephone: { type: string }
+        niveau: { type: string }
+        photoUrl: { type: string }
+        documentUrl: { type: string }
+        userId: { type: integer, format: int64 }
+    ApiError:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        status: { type: integer }
+        error: { type: string }
+        message: { type: string }
+        path: { type: string }
+        details:
+          type: array
+          items: { type: string }
+
+paths:
+  /auth/register:
+    post:
+      tags: [Authentification]
+      summary: Inscription d'un nouvel utilisateur (rôle ETUDIANT par défaut)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Compte créé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JwtResponse' }
+        '409':
+          description: Conflit (username/email déjà pris)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /auth/login:
+    post:
+      tags: [Authentification]
+      summary: Authentification — retourne un access token et un refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Connexion réussie
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JwtResponse' }
+        '401':
+          description: Identifiants invalides
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /auth/refresh:
+    post:
+      tags: [Authentification]
+      summary: Renouvellement du jeton (rotation du refresh token)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenRequest' }
+      responses:
+        '200':
+          description: Nouveaux jetons émis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JwtResponse' }
+        '401':
+          description: Refresh token invalide, expiré ou révoqué
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /auth/logout:
+    post:
+      tags: [Authentification]
+      summary: Déconnexion — révoque le refresh token
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenRequest' }
+      responses:
+        '200':
+          description: Déconnecté
+
+  /etudiants:
+    get:
+      tags: [Étudiants]
+      summary: Liste paginée des étudiants (ADMIN, ENSEIGNANT)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 10 } }
+        - { name: sort, in: query, schema: { type: string, default: lastName,asc } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Page d'étudiants
+    post:
+      tags: [Étudiants]
+      summary: Créer un étudiant (ADMIN)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EtudiantRequest' }
+      responses:
+        '201':
+          description: Étudiant créé
+
+  /etudiants/{id}:
+    get:
+      tags: [Étudiants]
+      summary: Détail d'un étudiant
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Étudiant trouvé
+    put:
+      tags: [Étudiants]
+      summary: Modifier un étudiant (ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EtudiantRequest' }
+      responses:
+        '200':
+          description: Étudiant modifié
+    delete:
+      tags: [Étudiants]
+      summary: Supprimer un étudiant (ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Étudiant supprimé
+
+  /etudiants/{id}/photo:
+    post:
+      tags: [Étudiants]
+      summary: Upload photo de profil (ADMIN, ETUDIANT propriétaire) — JPEG/PNG ≤ 2 Mo
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Photo enregistrée
+
+  /etudiants/{id}/docs:
+    post:
+      tags: [Étudiants]
+      summary: Upload document PDF (ADMIN, ETUDIANT propriétaire) — ≤ 5 Mo
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Document enregistré
+
+  /cours:
+    get:
+      tags: [Cours]
+      summary: Liste des cours disponibles (utilisateurs authentifiés)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 10 } }
+      responses:
+        '200':
+          description: Page de cours
+
+  /inscriptions:
+    post:
+      tags: [Inscriptions]
+      summary: Inscrire un étudiant à un cours (ADMIN)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [etudiantId, coursId]
+              properties:
+                etudiantId: { type: integer, format: int64 }
+                coursId: { type: integer, format: int64 }
+      responses:
+        '201':
+          description: Inscription créée
+        '409':
+          description: Étudiant déjà inscrit à ce cours
+
